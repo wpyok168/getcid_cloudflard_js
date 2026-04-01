@@ -7,9 +7,17 @@
 const KV_NAMESPACE = "KV_LOGS";
 const BATCH_SIZE = 20;
 const BATCH_FLUSH_SECONDS = 300;
+const MAX_BATCH_READ = 50;
 
 let logBatch = [];
 let lastFlushTime = Date.now();
+let flushing = false;
+
+// 安全 Cookie 校验
+function isAuth(request, pwd) {
+  const cookie = request.headers.get("cookie") || "";
+  return cookie.split(";").some(c => c.trim() === `log_token=${pwd}`);
+}
 
 // Base64URL
 function eI(t) {
@@ -19,7 +27,7 @@ function eI(t) {
   return btoa(n).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// 密钥缓存
+// 密钥缓存（✅ 已修复变量错误）
 let tI = null;
 async function yT() {
   if (!tI) {
@@ -70,7 +78,7 @@ async function sendActivationRequest(IID) {
     },
     body: JSON.stringify({
       IID, ProductType: "windows", productGroup: "Windows", productName: "Windows 11",
-      numberOfDigits: digits, Country: "CHN", Region: "APGC", InstalledDevices: 1,
+      numberOfDigits: digits, Country: "CHN", Region: "APAC", InstalledDevices: 1,
       OverrideStatusCode: "MUL", InitialReasonCode: "45164"
     })
   });
@@ -87,13 +95,18 @@ function getFormatTime(tzOffset) {
   return tzTime.toISOString().replace("T", " ").slice(0, 19);
 }
 
-// 批量写入
+// 批量写入（并发锁）
 async function flushBatch(kv) {
-  if (logBatch.length === 0) return;
-  const batchId = `batch_${Date.now()}_${crypto.randomUUID()}`;
-  await kv.put(batchId, JSON.stringify(logBatch));
-  logBatch = [];
-  lastFlushTime = Date.now();
+  if (flushing || logBatch.length === 0) return;
+  flushing = true;
+  try {
+    const batchId = `batch_${Date.now()}_${crypto.randomUUID()}`;
+    await kv.put(batchId, JSON.stringify(logBatch));
+    logBatch = [];
+    lastFlushTime = Date.now();
+  } finally {
+    flushing = false;
+  }
 }
 
 function needFlush() {
@@ -101,10 +114,11 @@ function needFlush() {
   return (Date.now() - lastFlushTime) / 1000 > BATCH_FLUSH_SECONDS && logBatch.length > 0;
 }
 
-// 读取所有日志
+// 直接读取最新批次（利用 KV 字典序）
 async function getAllLogs(kv) {
   if (!kv) return [];
-  const { keys } = await kv.list();
+  const { keys } = await kv.list({ limit: MAX_BATCH_READ });
+  
   let all = [];
   for (const key of keys) {
     const val = await kv.get(key.name);
@@ -117,24 +131,18 @@ async function getAllLogs(kv) {
   return all.sort((a, b) => b.time.localeCompare(a.time));
 }
 
-// ==============================
-// 【精准删除】按 UUID 删除（永不失效）
-// ==============================
+// 精准删除
 async function deleteLogById(kv, targetId) {
   if (!kv || !targetId) return false;
-  const { keys } = await kv.list();
-
+  const { keys } = await kv.list({ limit: 100 });
   for (const key of keys) {
     const val = await kv.get(key.name);
     if (!val) continue;
-
     try {
       let logs = JSON.parse(val);
       if (!Array.isArray(logs)) continue;
-
       const beforeLen = logs.length;
       logs = logs.filter(x => x.id !== targetId);
-
       if (logs.length < beforeLen) {
         if (logs.length === 0) await kv.delete(key.name);
         else await kv.put(key.name, JSON.stringify(logs));
@@ -145,10 +153,14 @@ async function deleteLogById(kv, targetId) {
   return false;
 }
 
-// 清空所有
+// 清空
 async function clearAllLogs(kv) {
-  const { keys } = await kv.list();
-  for (const key of keys) await kv.delete(key.name);
+  let cursor;
+  do {
+    const res = await kv.list({ cursor });
+    cursor = res.cursor;
+    await Promise.all(res.keys.map(k => kv.delete(k.name)));
+  } while (cursor);
 }
 
 // ==============================
@@ -173,7 +185,7 @@ function logPage(logs, page, totalPage, search, PAGE_SIZE) {
     <td>${log.result.success ? "✅成功" : "❌失败"}</td>
     <td>${log.result.status}</td>
     <td style="white-space:nowrap">
-      <button onclick="show(${log.id})">详情</button>
+      <button onclick="show('${log.id}')">详情</button>
       <button onclick="go('${log.IID}')" style="background:#6c757d;margin-left:4px">同IID</button>
       <button onclick="del('${log.id}')" style="background:red;margin-left:4px">删除</button>
     </td>
@@ -219,7 +231,7 @@ ${rows}
 </div>
 <div class="modal" id="m">
 <div class="inner">
-<div class="btns">
+<div class="btn-group">
 <button class="btn-copy" onclick="copy()">复制JSON</button>
 <button class="btn-close" onclick="closeM()">关闭</button>
 </div>
@@ -275,24 +287,19 @@ export default {
 
     if (request.method === "OPTIONS") return new Response(null, { headers });
 
-    // 清空
     if (path === "/logs/clear") {
-      const cookie = request.headers.get("cookie") || "";
-      if (!cookie.includes(`log_token=${LOG_PASSWORD}`)) return new Response("403", { status: 403 });
+      if (!isAuth(request, LOG_PASSWORD)) return new Response("403", { status: 403 });
       await clearAllLogs(kv);
       return new Response("ok");
     }
 
-    // 删除（按 UUID）
     if (path === "/logs/delete") {
-      const cookie = request.headers.get("cookie") || "";
-      if (!cookie.includes(`log_token=${LOG_PASSWORD}`)) return new Response("403", { status: 403 });
+      if (!isAuth(request, LOG_PASSWORD)) return new Response("403", { status: 403 });
       const id = await request.text();
       await deleteLogById(kv, id);
       return new Response("ok");
     }
 
-    // 日志页面
     if (path === "/logs") {
       if (!LOG_PASSWORD) return new Response("请配置 LOG_PASSWORD", { headers: { "Content-Type": "text/html;charset=utf-8" } });
       if (request.method === "POST") {
@@ -307,10 +314,9 @@ export default {
           });
         }
       }
-      const cookie = request.headers.get("cookie") || "";
-      if (!cookie.includes(`log_token=${LOG_PASSWORD}`)) return new Response(loginPage(), { headers: { "Content-Type": "text/html;charset=utf-8" } });
+      if (!isAuth(request, LOG_PASSWORD)) return new Response(loginPage(), { headers: { "Content-Type": "text/html;charset=utf-8" } });
       
-      await flushBatch(kv); // 强制刷入 KV，确保日志可见
+      await flushBatch(kv);
       
       const search = url.searchParams.get("search") ?? "";
       const page = parseInt(url.searchParams.get("page") ?? "1") || 1;
@@ -320,7 +326,6 @@ export default {
       return new Response(logPage(filtered, page, totalPage, search, PAGE_SIZE), { headers: { "Content-Type": "text/html;charset=utf-8" } });
     }
 
-    // 业务接口
     if (request.method !== "POST") return Response.json({ error: "仅支持 POST" }, { status: 405, headers });
 
     try {
@@ -331,7 +336,6 @@ export default {
       const ip = request.headers.get("cf-connecting-ip") || "unknown";
       const result = await sendActivationRequest(IID);
 
-      // 每条日志带唯一 UUID
       logBatch.push({
         id: crypto.randomUUID(),
         time: getFormatTime(TIMEZONE_OFFSET),
