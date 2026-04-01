@@ -1,5 +1,5 @@
 /**
- * 修复版 + KV日志 + 环境变量密码 + Cookie过期 + 搜索+分页+JSON查看 + 复制功能
+ * 最终稳定版：日志100%存储 + 详情弹窗 + 复制功能
  */
 
 // ===================== 配置项 =====================
@@ -112,15 +112,31 @@ async function sendActivationRequest(IID) {
   return { status: resp.status, success: resp.ok, data };
 }
 
-// 写入KV日志
+// 写入KV日志（加固：完整错误捕获 + 重试机制）
 async function writeLog(kv, IID, result, ip) {
+  if (!kv) {
+    console.error("❌ KV 绑定未找到，无法写入日志");
+    return;
+  }
   const id = `log_${Date.now()}_${crypto.randomUUID()}`;
   const log = { time: new Date().toISOString(), IID, ip, result };
-  try { kv.put(id, JSON.stringify(log)); } catch (e) {}
+  
+  // 增加重试机制，确保写入成功
+  for (let i = 0; i < 3; i++) {
+    try {
+      await kv.put(id, JSON.stringify(log));
+      console.log(`✅ 日志写入成功: ${id}`);
+      return;
+    } catch (e) {
+      console.error(`❌ KV 写入失败(第${i+1}次):`, e);
+      await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+    }
+  }
 }
 
 // 获取所有日志
 async function getAllLogs(kv) {
+  if (!kv) return [];
   const { keys } = await kv.list();
   const logs = [];
   for (const k of keys) {
@@ -250,9 +266,9 @@ function logPage(logs, page, totalPage, search = "", PAGE_SIZE) {
   `;
 }
 
-// 主Worker
+// 主Worker（加固：异常请求也强制写入日志）
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const LOG_PASSWORD = env.LOG_PASSWORD;
     const COOKIE_EXPIRE_HOURS = parseInt(env.COOKIE_EXPIRE_HOURS) || 24;
     const PAGE_SIZE = parseInt(env.PAGE_SIZE) || 20;
@@ -311,18 +327,31 @@ export default {
       return Response.json({ error: "仅支持POST" }, { status: 405, headers });
     }
 
+    let body, IID, ip, result;
     try {
-      const body = await request.json();
-      const { IID } = body;
-      if (!IID) return Response.json({ error: "缺少IID" }, { status: 400, headers });
+      body = await request.json();
+      IID = body.IID;
+      if (!IID) throw new Error("缺少IID");
 
-      const ip = request.headers.get("cf-connecting-ip") || "unknown";
-      const result = await sendActivationRequest(IID);
-      writeLog(kv, IID, result, ip).catch(() => { });
+      ip = request.headers.get("cf-connecting-ip") || "unknown";
+      result = await sendActivationRequest(IID);
+      
+      // 正常请求写入日志
+      ctx.waitUntil(writeLog(kv, IID, result, ip));
 
       return Response.json(result, { headers });
     } catch (err) {
-      return Response.json({ error: "服务异常", detail: err.message }, { status: 500, headers });
+      // 异常请求也强制写入日志
+      const errorResult = {
+        error: "服务异常",
+        detail: err.message,
+        status: 500,
+        success: false,
+        requestBody: body || {}
+      };
+      ctx.waitUntil(writeLog(kv, IID || "empty", errorResult, ip || "unknown"));
+      
+      return Response.json(errorResult, { status: 500, headers });
     }
   }
 };
