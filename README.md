@@ -1,12 +1,8 @@
 IID 激活服务 · Cloudflare Workers 版
+
 基于 Cloudflare Workers + KV 存储实现的 IID 激活验证服务，支持日志管理、密码保护、UUID 精准删除、同 IID 筛选，解决分布式无状态环境下日志删除错乱问题。
 
-
-
-
-
-
-
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-blue) ![Cloudflare KV](https://img.shields.io/badge/Storage-KV-green) ![Status Stable](https://img.shields.io/badge/Status-Stable-brightgreen) ![License MIT](https://img.shields.io/badge/License-MIT-orange)
 
 📋 目录
 
@@ -32,19 +28,19 @@ IID 激活服务 · Cloudflare Workers 版
 
 ✨ 项目特性
 
-- ✅ IID 激活验证：调用官方接口完成 IID 验证，返回完整结果
+- ✅ **IID 激活验证**：调用官方接口完成 IID 验证，返回完整结果
 
-- ✅ UUID 精准删除：解决 Cloudflare Workers 无状态环境下日志删除错乱问题
+- ✅ **UUID 精准删除**：解决 Cloudflare Workers 无状态环境下日志删除错乱问题
 
-- ✅ 日志管理：支持单条删除、清空所有、同 IID 筛选、分页展示
+- ✅ **日志管理**：支持单条删除、清空所有、同 IID 筛选、分页展示
 
-- ✅ 密码保护：日志面板需密码登录，Cookie 有效期 1 天，保障安全
+- ✅ **密码保护**：日志面板需密码登录，Cookie 有效期 1 天，保障安全
 
-- ✅ 批量日志：每 20 条或 5 分钟自动刷入 KV，提升性能
+- ✅ **批量日志**：每 20 条或 5 分钟自动刷入 KV，提升性能
 
-- ✅ 时区配置：支持自定义时区偏移，日志时间显示更精准
+- ✅ **时区配置**：支持自定义时区偏移，日志时间显示更精准
 
-- ✅ 跨域支持：接口支持跨域访问，适配前端调用
+- ✅ **跨域支持**：接口支持跨域访问，适配前端调用
 
 📌 环境要求
 
@@ -58,7 +54,7 @@ IID 激活服务 · Cloudflare Workers 版
 
 3.1 环境变量配置（必填+可选）
 
-进入 Cloudflare Workers → 对应 Worker → 设置 → 环境变量，添加以下变量：
+进入 Cloudflare Workers → 对应 Worker → **设置** → **环境变量**，添加以下变量：
 
 变量名
 
@@ -92,7 +88,8 @@ TIMEZONE_OFFSET
 
 ❌ 可选
 
-示例配置：
+💡 示例配置：
+
 LOG_PASSWORD=YourStrongPassword123
 PAGE_SIZE=30
 TIMEZONE_OFFSET=8
@@ -101,18 +98,18 @@ TIMEZONE_OFFSET=8
 
 3.2.1 创建 KV 命名空间
 
-1. 进入 Cloudflare 控制台 → Workers & Pages → KV
+1. 进入 Cloudflare 控制台 → **Workers & Pages** → **KV**
 
-2. 点击 创建命名空间，填写名称（如 IID_LOGS），点击创建
+2. 点击 **创建命名空间**，填写名称（如 IID_LOGS），点击创建
 
 3.2.2 绑定 KV 到 Worker
 
-1. 进入对应 Worker → 设置 → 变量 → KV 命名空间绑定
+1. 进入对应 Worker → **设置** → **变量** → **KV 命名空间绑定**
 
-2. 点击 添加绑定，填写：
+2. 点击 **添加绑定**，填写：
         
 
-  - 变量名称：KV_LOGS（必须严格一致，否则脚本无法读写日志）
+  - 变量名称：KV_LOGS（**必须严格一致**，否则脚本无法读写日志）
 
   - 命名空间：选择刚才创建的 KV 命名空间
 
@@ -170,7 +167,7 @@ batch_时间戳_UUID
 
 POST
 
-IID 激活验证接口，接收 JSON 参数 { "IID": "xxx" }
+IID 激活验证接口，接收 JSON 参数{ "IID": "xxx" }
 
 公开（无密码）
 
@@ -200,15 +197,15 @@ POST
 
 🚀 快速部署
 
-1. 新建 Cloudflare Workers：进入 Workers & Pages → 创建应用 → 创建 Worker，填写名称后部署（暂时部署空白 Worker）。
+1. 新建 Cloudflare Workers：进入 **Workers & Pages** → **创建应用** → **创建 Worker**，填写名称后部署（暂时部署空白 Worker）。
 
-2. 替换脚本：进入 Worker → 编辑代码，删除默认代码，粘贴项目完整脚本，保存。
+2. 替换脚本：进入 Worker → **编辑代码**，删除默认代码，粘贴项目完整脚本，保存。
 
 3. 配置环境变量：按照 3.1 节 添加 LOG_PASSWORD 等变量。
 
 4. 绑定 KV：按照 3.2.2 节 绑定 KV 命名空间。
 
-5. 重新部署：点击 部署，部署完成后，访问 https://你的Worker域名/logs，输入密码登录日志面板。
+5. 重新部署：点击 **部署**，部署完成后，访问 https://你的Worker域名/logs，输入密码登录日志面板。
 
 🔒 安全说明
 
@@ -242,4 +239,4 @@ A: 检查脚本中 sendActivationRequest 函数的请求参数、请求头是否
 
 本项目采用 MIT 许可证开源，可自由修改、分发，使用时请保留原作者信息。
 
-如果本项目对你有帮助，欢迎 Star 支持！
+🌟 如果本项目对你有帮助，欢迎 Star 支持！
