@@ -7,30 +7,45 @@
 - works2.js 带日志
 - works3.js 带日志 (每满 20 条 → 立即批量存 1 次;超过 5 分钟（300 秒）还没满 20 条 → 有数据就存，无数据不操作)
 
+## 🚀 快速部署
+
+### 方式 1：一键部署（推荐）
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/你的用户名/你的仓库)
+
+### 方式 2：手动部署
+1. 登录 Cloudflare → Workers & Pages → 创建应用 → 创建 Worker
+2. 编辑代码 → 粘贴 `worker.js`
+3. 配置环境变量 `LOG_PASSWORD`
+4. 绑定 KV 命名空间为 `KV_LOGS`
+5. 保存并部署
+
+## 🔗 访问地址
+- 激活接口（POST）：`https://你的worker域名.workers.dev/`
+- 日志面板：`https://你的worker域名.workers.dev/logs`
 
 
 
 ## 📋 目录
 
-- [项目特性](https://www.doubao.cn)
+- [项目特性]
 
-- [环境要求](https://www.doubao.cn)
+- [环境要求]
 
-- [配置指南](https://www.doubao.cn)
+- [配置指南]
 
     - 环境变量配置
 
     - KV 命名空间配置
 
-- [存储结构](https://www.doubao.cn)
+- [存储结构]
 
-- [路由说明](https://www.doubao.cn)
+- [路由说明]
 
-- [快速部署](https://www.doubao.cn)
+- [快速部署]
 
-- [安全说明](https://www.doubao.cn)
+- [安全说明]
 
-- [常见问题](https://www.doubao.cn)
+- [常见问题]
 
 ## ✨ 项目特性
 
@@ -151,9 +166,9 @@ batch_时间戳_UUID
 
 2. 替换脚本：进入 Worker → **编辑代码**，删除默认代码，粘贴项目完整脚本，保存。
 
-3. 配置环境变量：按照 [3.1 节](https://www.doubao.cn) 添加 `LOG_PASSWORD` 等变量。
+3. 配置环境变量：按照 [3.1 节] 添加 `LOG_PASSWORD` 等变量。
 
-4. 绑定 KV：按照 [3.2.2 节](https://www.doubao.cn) 绑定 KV 命名空间。
+4. 绑定 KV：按照 [3.2.2 节] 绑定 KV 命名空间。
 
 5. 重新部署：点击 **部署**，部署完成后，访问 `https://你的Worker域名/logs`，输入密码登录日志面板。
 
