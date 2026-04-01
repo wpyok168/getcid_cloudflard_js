@@ -313,7 +313,7 @@ export default {
       await flushBatch(kv); // 强制刷入 KV，确保日志可见
       
       const search = url.searchParams.get("search") || "";
-      const page = parseInt(url.searchParams.get("page") || 1);
+      const page = parseInt(url.searchParams.get("page") ?? "1") || 1;
       const logs = await getAllLogs(kv);
       const filtered = search ? logs.filter(x => x.IID.includes(search)) : logs;
       const totalPage = Math.ceil(filtered.length / PAGE_SIZE);
