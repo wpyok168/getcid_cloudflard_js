@@ -1,0 +1,19 @@
+name = "iid-activation-service"
+main = "worker.js"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV 命名空间绑定（必须绑定为 KV_LOGS）
+kv_namespaces = [
+  { binding = "KV_LOGS", id = "" }
+]
+
+# 环境变量默认值
+[vars]
+PAGE_SIZE = 20
+TIMEZONE_OFFSET = 8
+LOG_PASSWORD = ""
+
+# 触发器规则
+[triggers]
+crons = []
