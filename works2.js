@@ -1,10 +1,9 @@
 /**
- * 最终优化版 · IID 激活服务
- * 修复1101 + KV日志 + 环境变量密码 + 24h Cookie + 搜索+分页+JSON查看
+ * 修复版 + KV日志 + 环境变量密码 + Cookie过期 + 搜索+分页+JSON查看 + 复制功能
  */
 
 // ===================== 配置项 =====================
-const KV_NAMESPACE = "KV_LOGS";         // KV绑定名
+const KV_NAMESPACE = "KV_LOGS";
 // ==================================================
 
 // Base64URL
@@ -15,7 +14,7 @@ function eI(t) {
   return btoa(n).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// 密钥缓存
+// 全局密钥对缓存
 let tI = null;
 async function yT() {
   if (!tI) {
@@ -33,6 +32,7 @@ async function c1e(t, e) {
   try {
     const { privateKey, publicKey } = await yT();
     const jwk = await crypto.subtle.exportKey("jwk", publicKey);
+
     const header = { alg: "ES256", typ: "dpop+jwt", jwk };
     const payload = {
       htu: t,
@@ -40,17 +40,21 @@ async function c1e(t, e) {
       jti: crypto.randomUUID(),
       iat: Math.floor(Date.now() / 1000)
     };
+
     const s = eI(JSON.stringify(header));
     const l = eI(JSON.stringify(payload));
     const u = `${s}.${l}`;
+
     const p = await crypto.subtle.sign(
       { name: "ECDSA", hash: "SHA-256" },
       privateKey,
       new TextEncoder().encode(u)
     );
-    return `${u}.${eI(p)}`;
+
+    const g = eI(p);
+    return `${u}.${g}`;
   } catch (err) {
-    throw new Error("DPoP 生成失败: " + err.message);
+    throw new Error("DPoP生成失败: " + err.message);
   }
 }
 
@@ -62,7 +66,11 @@ function GenerateSessionId() {
 // 安全解析
 async function safeParse(resp) {
   const text = await resp.text();
-  try { return JSON.parse(text); } catch { return { raw: text }; }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
 }
 
 // 核心请求
@@ -97,21 +105,21 @@ async function sendActivationRequest(IID) {
       })
     });
   } catch (e) {
-    throw new Error("请求失败: " + e.message);
+    throw new Error("fetch失败: " + e.message);
   }
 
   const data = await safeParse(resp);
   return { status: resp.status, success: resp.ok, data };
 }
 
-// 写入日志
+// 写入KV日志
 async function writeLog(kv, IID, result, ip) {
   const id = `log_${Date.now()}_${crypto.randomUUID()}`;
   const log = { time: new Date().toISOString(), IID, ip, result };
-  try { await kv.put(id, JSON.stringify(log)); } catch (e) {}
+  try { kv.put(id, JSON.stringify(log)); } catch (e) {}
 }
 
-// 获取日志
+// 获取所有日志
 async function getAllLogs(kv) {
   const { keys } = await kv.list();
   const logs = [];
@@ -122,8 +130,8 @@ async function getAllLogs(kv) {
   return logs.sort((a, b) => b.time.localeCompare(a.time));
 }
 
-// 登录页
-function loginPage(showError = false) {
+// 密码页面
+function loginPage() {
   return `
 <!DOCTYPE html>
 <meta charset="utf-8">
@@ -132,56 +140,37 @@ function loginPage(showError = false) {
   body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f4f6f8}
   .box{padding:2rem;background:white;border-radius:12px;box-shadow:0 2px 10px #00000010;width:320px}
   h2{margin-top:0}
-  .err{color:red;text-align:center;margin-bottom:10px}
   input{width:100%;padding:10px;margin:10px 0;box-sizing:border-box;border:1px solid #ddd;border-radius:6px}
   button{width:100%;padding:10px;background:#0066cc;color:white;border:none;border-radius:6px;cursor:pointer}
 </style>
 <div class="box">
   <h2>日志访问验证</h2>
-  ${showError ? '<div class="err">密码错误</div>' : ''}
   <form method="POST">
     <input type="password" name="pwd" placeholder="请输入密码" required>
-    <button>登录</button>
+    <button>登录查看日志</button>
   </form>
 </div>
   `;
 }
 
-// 未配置密码提示页
-function needSetupPasswordPage() {
-  return `
-<!DOCTYPE html>
-<meta charset="utf-8">
-<title>未配置密码</title>
-<style>
-  body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f4f6f8}
-  .box{padding:2rem;background:white;border-radius:12px;box-shadow:0 2px 10px #00000010;width:320px;text-align:center}
-  h2{color:red}
-  p{font-size:14px;color:#666}
-</style>
-<div class="box">
-  <h2>⚠️ 未配置登录密码</h2>
-  <p>请在 Cloudflare Worker 环境变量中配置：</p>
-  <p><strong>LOG_PASSWORD</strong></p>
-</div>
-  `;
-}
-
-// 日志页面
+// 日志页面（搜索+分页+JSON查看+复制）
 function logPage(logs, page, totalPage, search = "", PAGE_SIZE) {
   const start = (page - 1) * PAGE_SIZE;
   const end = start + PAGE_SIZE;
   const paginated = logs.slice(start, end);
 
-  const rows = paginated.map(log => `
+  const rows = paginated.map((log, idx) => `
   <tr>
     <td>${log.time}</td>
     <td style="font-family:monospace;font-size:12px">${log.IID}</td>
     <td>${log.ip}</td>
     <td>${log.result.success ? '✅成功' : '❌失败'}</td>
     <td>${log.result.status}</td>
-    <td><button onclick="showJson(${JSON.stringify(JSON.stringify(log.result, null, 2))})">查看详情</button></td>
-  </tr>`).join('');
+    <td><button onclick="showJson(${idx})">查看详情</button></td>
+  </tr>
+  `).join('');
+
+  const logDataList = JSON.stringify(paginated.map(x => x.result));
 
   const pager = [];
   for (let i = 1; i <= totalPage; i++) {
@@ -203,9 +192,13 @@ function logPage(logs, page, totalPage, search = "", PAGE_SIZE) {
   th{background:#f8f9fa}
   .pager{margin-top:1rem}
   .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#00000080}
-  .modal .inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;width:90%;max-width:700px;max-height:80vh;overflow:auto;border-radius:8px}
-  pre{background:#f8f9fa;padding:1rem;border-radius:6px;overflow:auto}
+  .modal .inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:white;padding:20px;width:90%;max-width:700px;max-height:80vh;overflow:auto;border-radius:8px}
+  pre{background:#f8f9fa;padding:1rem;border-radius:6px;overflow:auto;white-space:pre-wrap}
   button{padding:6px 10px;border:none;background:#0066cc;color:white;border-radius:4px;cursor:pointer}
+  .btn-copy{background:#28a745}
+  .btn-close{background:#6c757d}
+  .modal-btns{display:flex;gap:8px;margin-bottom:10px}
 </style>
 <div class="card">
   <h1>IID 激活请求日志</h1>
@@ -221,26 +214,48 @@ function logPage(logs, page, totalPage, search = "", PAGE_SIZE) {
 </div>
 <div class="modal" id="modal">
   <div class="inner">
-    <button onclick="closeModal()">关闭</button>
+    <div class="modal-btns">
+      <button class="btn-copy" onclick="copyJson()">📋 复制JSON</button>
+      <button class="btn-close" onclick="closeModal()">关闭</button>
+    </div>
     <pre id="json"></pre>
   </div>
 </div>
 <script>
-  function doSearch(){ location.href='?search='+encodeURIComponent(document.getElementById('search').value); }
-  function showJson(json){ document.getElementById('json').textContent = json; document.getElementById('modal').style.display='block'; }
-  function closeModal(){ document.getElementById('modal').style.display='none'; }
+  const logResults = ${logDataList};
+  let currentJson = '';
+
+  function doSearch(){
+    const s = document.getElementById('search').value;
+    location.href='?search='+encodeURIComponent(s);
+  }
+
+  function showJson(idx){
+    const data = logResults[idx];
+    currentJson = JSON.stringify(data, null, 2);
+    document.getElementById('json').textContent = currentJson;
+    document.getElementById('modal').style.display='block';
+  }
+
+  function closeModal(){
+    document.getElementById('modal').style.display='none';
+  }
+
+  async function copyJson(){
+    if(!currentJson) return;
+    await navigator.clipboard.writeText(currentJson);
+    alert('复制成功！');
+  }
 </script>
   `;
 }
 
-// 主入口
+// 主Worker
 export default {
   async fetch(request, env) {
-    // 从环境变量读取所有可配置项
     const LOG_PASSWORD = env.LOG_PASSWORD;
     const COOKIE_EXPIRE_HOURS = parseInt(env.COOKIE_EXPIRE_HOURS) || 24;
     const PAGE_SIZE = parseInt(env.PAGE_SIZE) || 20;
-
     const COOKIE_EXPIRE = COOKIE_EXPIRE_HOURS * 3600;
     const kv = env[KV_NAMESPACE];
     const url = new URL(request.url);
@@ -254,16 +269,14 @@ export default {
 
     if (request.method === "OPTIONS") return new Response(null, { headers });
 
-    // ========== 日志页面 ==========
+    // 日志页面
     if (path === "/logs") {
-      // 未配置密码 → 提示设置
       if (!LOG_PASSWORD) {
-        return new Response(needSetupPasswordPage(), {
-          headers: { "Content-Type": "text/html; charset=utf-8" }
+        return new Response(`<body style="padding:2rem"><h2>请配置 LOG_PASSWORD 环境变量</h2></body>`, {
+          headers: { "Content-Type": "text/html;charset=utf-8" }
         });
       }
 
-      // 登录提交
       if (request.method === "POST") {
         const form = await request.formData();
         const pwd = form.get("pwd");
@@ -276,44 +289,36 @@ export default {
             }
           });
         }
-        return new Response(loginPage(true), {
-          headers: { "Content-Type": "text/html; charset=utf-8" }
-        });
       }
 
-      // 验证登录状态
       const cookie = request.headers.get("cookie") || "";
       if (!cookie.includes(`log_token=${LOG_PASSWORD}`)) {
-        return new Response(loginPage(), {
-          headers: { "Content-Type": "text/html; charset=utf-8" }
-        });
+        return new Response(loginPage(), { headers: { "Content-Type": "text/html; charset=utf-8" } });
       }
 
-      // 加载日志
       const search = url.searchParams.get("search") || "";
       const page = parseInt(url.searchParams.get("page")) || 1;
       let logs = await getAllLogs(kv);
       if (search) logs = logs.filter(x => x.IID.includes(search));
       const totalPage = Math.ceil(logs.length / PAGE_SIZE);
-
       return new Response(logPage(logs, page, totalPage, search, PAGE_SIZE), {
         headers: { "Content-Type": "text/html; charset=utf-8" }
       });
     }
 
-    // ========== 业务接口 ==========
+    // 业务接口
     if (request.method !== "POST") {
-      return Response.json({ error: "仅支持 POST" }, { status: 405, headers });
+      return Response.json({ error: "仅支持POST" }, { status: 405, headers });
     }
 
     try {
       const body = await request.json();
       const { IID } = body;
-      if (!IID) return Response.json({ error: "缺少 IID" }, { status: 400, headers });
+      if (!IID) return Response.json({ error: "缺少IID" }, { status: 400, headers });
 
       const ip = request.headers.get("cf-connecting-ip") || "unknown";
       const result = await sendActivationRequest(IID);
-      writeLog(kv, IID, result, ip).catch(() => {});
+      writeLog(kv, IID, result, ip).catch(() => { });
 
       return Response.json(result, { headers });
     } catch (err) {
