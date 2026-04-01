@@ -177,6 +177,7 @@ function logPage(logs, page, totalPage, search, PAGE_SIZE) {
   const end = start + PAGE_SIZE;
   const paginated = logs.slice(start, end);
 
+  // 按钮顺序：删除 → 同IID → 详情
   const rows = paginated.map((log) => `
   <tr>
     <td>${log.time}</td>
@@ -185,9 +186,9 @@ function logPage(logs, page, totalPage, search, PAGE_SIZE) {
     <td>${log.result.success ? "✅成功" : "❌失败"}</td>
     <td>${log.result.status}</td>
     <td style="white-space:nowrap">
-      <button onclick="show('${log.id}')">详情</button>
+      <button onclick="del('${log.id}')" style="background:red">删除</button>
       <button onclick="go('${log.IID}')" style="background:#6c757d;margin-left:4px">同IID</button>
-      <button onclick="del('${log.id}')" style="background:red;margin-left:4px">删除</button>
+      <button onclick="show('${log.id}')" style="margin-left:4px">详情</button>
     </td>
   </tr>`).join("");
 
@@ -213,6 +214,8 @@ button{padding:4px 8px;border:none;background:#0066cc;color:white;border-radius:
 .btn-close{background:#6c757d}
 .btn-clear{background:red;padding:6px 10px}
 .btns{display:flex;gap:8px;margin-bottom:10px}
+/* 弹窗按钮右对齐 */
+.btn-group{display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px}
 </style>
 <div class="card">
 <h1>IID激活日志</h1>
