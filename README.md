@@ -1,7 +1,11 @@
 # IID 激活服务 Cloudflare Worker
 基于 Cloudflare Workers 构建的 IID 验证与请求日志服务，支持密码保护、分页查询、JSON 详情查看。
 
-## 配置说明
+## 版本说明
+works1.js 无日志
+works2.js 带日志
+
+## 带日志版本配置说明
 
 ### 1. 环境变量配置
 在 Workers → 设置 → 变量 → 环境变量 中添加：
