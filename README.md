@@ -10,7 +10,7 @@
 ## 🚀 快速部署
 
 ### 方式 1：一键部署（推荐）
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/你的用户名/你的仓库)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/wpyok168/getcid_cloudflard_js)
 
 ### 方式 2：手动部署
 1. 登录 Cloudflare → Workers & Pages → 创建应用 → 创建 Worker
