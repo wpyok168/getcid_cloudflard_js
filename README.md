@@ -3,13 +3,14 @@
 基于 Cloudflare Workers + KV 存储实现的 IID 激活验证服务，支持日志管理、密码保护、UUID 精准删除、同 IID 筛选，解决分布式无状态环境下日志删除错乱问题。
 
 ## 版本说明
-- works1.js 无日志
-- works2.js 带日志
-- works3.js 带日志 (每满 20 条 → 立即批量存 1 次;超过 5 分钟（300 秒）还没满 20 条 → 有数据就存，无数据不操作)
+- works1.js 无日志，cloudflare部署时无需设置KV、变量
+- works2.js 带日志（不建议部署使用）
+- works3.js 带日志 (每满 20 条 → 立即批量存 1 次;超过 5 分钟（300 秒）还没满 20 条 → 有数据就存，无数据不操作)（不建议部署使用）
+- worker4.js 带日志 在works3.js 基础上优化kv操作，一键部署（worker.js）采用此脚本
 
 ## 🚀 快速部署
 
-### 方式 1：一键部署（推荐）
+### 方式 1：一键部署（推荐）使用worker.js(即worker4.js)部署
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/wpyok168/getcid_cloudflard_js)
 
 ### 方式 2：手动部署
