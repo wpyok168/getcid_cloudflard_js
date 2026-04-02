@@ -1,58 +1,19 @@
-# 全局通用配置
+name = "iid-activation-service"
+main = "worker.js"
 compatibility_date = "2026-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# ==============================================
-# 主版本：worker.js ✅ 带 KV + 环境变量
-# ==============================================
-[env.main]
-name = "iid-activation-service"
-main = "worker.js"
-
 # KV 命名空间绑定（必须绑定为 KV_LOGS）
 kv_namespaces = [
   { binding = "KV_LOGS", id = "" }
 ]
 
 # 环境变量默认值
-[env.main.vars]
+[vars]
 PAGE_SIZE = 20
 TIMEZONE_OFFSET = 8
 LOG_PASSWORD = ""
 
 # 触发器规则
-[env.main.triggers]
-crons = []
-
-# ==============================================
-# V1版本：worker1.js 🚫 无KV、无环境变量
-# ==============================================
-[env.v1]
-name = "iid-activation-service-v1"
-main = "worker1.js"
-
-# 触发器规则
-[env.v1.triggers]
-crons = []
-
-# ==============================================
-# V4版本：worker4.js ✅ 带 KV + 环境变量
-# ==============================================
-[env.v4]
-name = "iid-activation-service-v4"
-main = "worker4.js"
-
-# KV 命名空间绑定（必须绑定为 KV_LOGS）
-kv_namespaces = [
-  { binding = "KV_LOGS", id = "" }
-]
-
-# 环境变量默认值
-[env.v4.vars]
-PAGE_SIZE = 20
-TIMEZONE_OFFSET = 8
-LOG_PASSWORD = ""
-
-# 触发器规则
-[env.v4.triggers]
+[triggers]
 crons = []
