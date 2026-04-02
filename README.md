@@ -15,7 +15,7 @@
 
 ### 方式 2：手动部署
 1. 登录 Cloudflare → Workers & Pages → 创建应用 → 创建 Worker
-2. 编辑代码 → 粘贴 `worker.js`或`worker1.js`
+2. 编辑代码 → 粘贴 `worker.js`（带日志）或`worker1.js`（无日志）
 3. 配置环境变量 `LOG_PASSWORD`
 4. 绑定 KV 命名空间为 `KV_LOGS`
 5. 保存并部署
