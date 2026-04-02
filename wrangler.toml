@@ -9,16 +9,16 @@ compatibility_flags = ["nodejs_compat"]
 name = "iid-activation-service"
 main = "worker.js"
 
-# KV 命名空间绑定（必须绑定为 KV_LOGS
+# KV 命名空间绑定（必须绑定为 KV_LOGS）
 kv_namespaces = [
-  { binding = "KV_LOGS", id = "填写主版本KV_ID" }
+  { binding = "KV_LOGS", id = "" }
 ]
 
 # 环境变量默认值
 [env.main.vars]
 PAGE_SIZE = 20
 TIMEZONE_OFFSET = 8
-LOG_PASSWORD = "请设置密码"
+LOG_PASSWORD = ""
 
 # 触发器规则
 [env.main.triggers]
@@ -42,16 +42,16 @@ crons = []
 name = "iid-activation-service-v4"
 main = "worker4.js"
 
-# KV 命名空间绑定（必须绑定为 KV_LOGS
+# KV 命名空间绑定（必须绑定为 KV_LOGS）
 kv_namespaces = [
-  { binding = "KV_LOGS", id = "填写V4版本KV_ID" }
+  { binding = "KV_LOGS", id = "" }
 ]
 
 # 环境变量默认值
 [env.v4.vars]
 PAGE_SIZE = 20
 TIMEZONE_OFFSET = 8
-LOG_PASSWORD = "请设置密码"
+LOG_PASSWORD = ""
 
 # 触发器规则
 [env.v4.triggers]
